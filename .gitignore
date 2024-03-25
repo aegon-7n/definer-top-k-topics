@@ -1,2 +1,18 @@
 # venv
-.venv/
+.venv
+
+# notebooks
+/notebooks
+
+# other
+.DS_Store
+.idea
+.ipynb_checkpoints
+.pytest_cache
+
+**/.DS_Store
+**/.ipynb_checkpoints
+
+mlflow/**
+log/**
+**/__pycache__/**
