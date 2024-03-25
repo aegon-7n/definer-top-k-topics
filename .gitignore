@@ -1,18 +1,13 @@
-# venv
 .venv
 
-# notebooks
-/notebooks
+/mlflow
+/airflow
 
-# other
 .DS_Store
-.idea
 .ipynb_checkpoints
 .pytest_cache
 
 **/.DS_Store
 **/.ipynb_checkpoints
 
-mlflow/**
-log/**
 **/__pycache__/**
