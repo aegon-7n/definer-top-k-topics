@@ -1,1 +1,1 @@
-Микросервис, определяющий тональность введенного пользователем теста как нейтральную, негативную или позитивную. Пока так)
+Identify the most popular hot topics in the comments to top videos for a specific query. For the first time.
