@@ -1,11 +1,10 @@
 .venv
 
-/notebooks
-
 /mlflow
 /airflow
-
 config/params_all.yaml
+/log
+
 
 .DS_Store
 .ipynb_checkpoints
