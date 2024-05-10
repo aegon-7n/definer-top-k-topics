@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    restart: always
+    ports:
+      - '8000:8000'
+      - '9443:9443'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data 
+
+  db_mlflow:
+    container_name: mlflow_pg_container
+    image: postgres:latest
+    restart: always
+    environment: 
+      POSTGRES_USER: ${POSTGRES_USER_MF}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_MF}
+      POSTGRES_DB: ${POSTGRES_DB_MF}
+      PGDATA: /var/lib/postgresql/data/db_mlflow
+    volumes:
+      - mlflow-db-volume:/var/lib/postgresql/data
+    ports:
+      - '5432:5433'
+    networks:
+      - db_mlflow
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", '${POSTGRES_USER_MF}']
+      interval: 5s
+      retries: 5
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    restart: always
+    environment: 
+      PGADMIN_DEFAULT_EMAIL: admin
+      PGADMIN_DEFAULT_PASSWORD: 5667
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - '5050:80'
+    networks: 
+      - db_mlflow
+
+  minio:
+    container_name: minio
+    image: minio/minio:latest
+    command: server --console-address ':9001' /data/
+    ports:
+     - "9000:9000"
+     - "9001:9001"
+    environment:
+      MINIO_ACCESS_KEY: ${AWS_ACCESS_KEY_ID}
+      MINIO_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - minio_app
+    volumes: 
+      - ./minio/:/data
+
+  mlflow:
+    container_name: mlflow_server
+    restart: always
+    build: ./images/mlflow_image
+    image: mlflow_image
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    networks:
+      - db_mlflow
+      - minio_app
+    command: mlflow server --backend-store-uri postgresql://${POSTGRES_USER_MF}:${POSTGRES_PASSWORD_MF}@db_mlflow/${POSTGRES_DB_MF} --default-artifact-root s3://${AWS_S3_BUCKET}/ --host 0.0.0.0
+
+volumes:
+  mlflow-db-volume:
+  pgadmin_data:
+  portainer_data:
+
+networks:
+  db_mlflow:
+    driver: bridge
+  minio_app:
+    driver: bridge

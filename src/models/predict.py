@@ -1,13 +1,19 @@
-import logging
+# import logging
 import os
+import sys
 
 import numpy as np
 import pandas as pd
 import yaml
 
 import mlflow
-import src.get_comments as gc
-import src.preprocessing_text as pt
+
+preprocessing_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'preprocessing'))
+sys.path.append(preprocessing_dir)
+
+import get_comments as gc
+import preprocessing_text as pt
+import cluster_train as cl
 
 import nltk
 from nltk.corpus import stopwords
@@ -15,24 +21,24 @@ nltk.download('punkt')
 nltk.download('stopwords')
 
 
-dir = '/home/aegon/Documents/Development/Projects/topic-sentiment-explorer/'
-config_path = os.path.join(dir + 'config/params_all.yaml')
-config = yaml.safe_load(open(config_path))['train']
-os.chdir(config['dir_folder'])
+dir = str(os.getcwd())
+config_path = f'{dir}/config/params_all.yaml'
+config = yaml.safe_load(open(config_path))['predict']
 SEED = config['SEED']
 
-logging.basicConfig(filename='log/app.log', 
-                    filemode='w+', format='%(asctime)s : %(levelname)s : %(message)s',
-                    level=logging.DEBUG)
-
+# logging.basicConfig(filename='log/app.log', 
+#                     filemode='w+', format='%(asctime)s : %(levelname)s : %(message)s',
+#                     level=logging.DEBUG)
 
 def save_topics(data, y_predict, vector_model, num_words, name_file):
+    current_directory = os.getcwd()
+    name_file = os.path.abspath(os.path.join(current_directory, name_file))
+
     topics = {}
     for i in list(set(y_predict)):
         ind_ = data[np.where(y_predict == i)[0]].sum(axis=0).argsort()[-num_words:]
-        topics[i] = [vector_model.get_feature_names()[i] for i in ind_]
-    pd.DataFrame().from_dict(topics).to_csv(name_file, encoding='cp1251')
-
+        topics[i] = [vector_model.get_feature_names_out()[i] for i in ind_]
+    pd.DataFrame().from_dict(topics).to_csv(name_file, index=False)
 
 def main():
     comments = gc.get_all_comments(**config['comments'])
@@ -51,7 +57,6 @@ def main():
     X_matrix = pt.vectorize_text(comments_clean, tfidf)
     
     save_topics(X_matrix, model_lr.predict(X_matrix), tfidf, config['num_top'], config['name_file'])
-
 
 if __name__ == "__main__":
     main()

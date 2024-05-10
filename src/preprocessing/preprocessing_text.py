@@ -1,6 +1,5 @@
 import re
-import nltk
-from nltk.stem import WordNetLemmatizer
+import pymorphy2
 import numpy as np
 from nltk.tokenize import word_tokenize
 
@@ -34,7 +33,7 @@ def remove_links(sentence):
     return sentence
 
 
-def preprocessing(sentence, stop_words, lemmatizer):
+def preprocessing(sentence, stop_words, morph):
     sentence = remove_emoji(sentence)
     sentence = remove_links(sentence)
 
@@ -43,15 +42,15 @@ def preprocessing(sentence, stop_words, lemmatizer):
 
     sentence = re.sub('(((?![а-яА-Я ]).)+)', ' ', sentence)
 
-    sentence = [lemmatizer.lemmatize(word) for word in word_tokenize(sentence) if word not in stop_words]
-    sentence = ' '.join(sentence)
+    sentence = [morph.parse(word)[0].normal_form for word in word_tokenize(sentence) if word not in stop_words and len(word) > 2]
+    sentence = ' '.join(sentence).lower()
     return sentence
 
 
 def get_clean_text(data, stop_words):
-    lemmatizer = WordNetLemmatizer()
-    comments = [preprocessing(sentence, stop_words, lemmatizer) for sentence in data]
-    comments = [comm for comm in comments if len(comm) > 2]
+    morph = pymorphy2.MorphAnalyzer()
+    comments = [preprocessing(sentence, stop_words, morph) for sentence in data]
+    comments = [comm for comm in comments if len(comm.split()) > 4]
     return comments
 
 

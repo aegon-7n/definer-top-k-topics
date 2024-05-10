@@ -1,9 +1,11 @@
 .venv
 
-/mlflow
-/airflow
+/airflow/logs
+/airflow/plugins
+
 config/params_all.yaml
-/log
+/minio
+
 
 
 .DS_Store
@@ -14,3 +16,6 @@ config/params_all.yaml
 **/.ipynb_checkpoints
 
 **/__pycache__/**
+
+.idea
+.vscode

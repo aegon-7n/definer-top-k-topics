@@ -1,5 +1,6 @@
-import logging
+# import logging
 import os
+import sys
 
 import yaml
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -11,32 +12,28 @@ import nltk
 from nltk.corpus import stopwords
 nltk.download('punkt')
 nltk.download('stopwords')
-import numpy as np
 
 import mlflow
 from mlflow.tracking import MlflowClient
-import src.cluster_train as cl
-import src.get_comments as gc
-import src.preprocessing_text as pt
 
+preprocessing_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'preprocessing'))
+sys.path.append(preprocessing_dir)
 
-dir = '/home/aegon/Documents/Development/Projects/topic-sentiment-explorer/'
-config_path = os.path.join(dir + 'config/params_all.yaml')
+import get_comments as gc
+import preprocessing_text as pt
+import cluster_train as cl
+
+dir = str(os.getcwd())
+config_path = f'{dir}/config/params_all.yaml'
 config = yaml.safe_load(open(config_path))['train']
-os.chdir(config['dir_folder'])
 SEED = config['SEED']
 
-logging.basicConfig(filename='log/app.log', filemode='w+', format='%(asctime)s : %(levelname)s : %(message)s',
-                    level=logging.DEBUG)
+# logging.basicConfig(filename='log/app.log', filemode='w+', format='%(asctime)s : %(levelname)s : %(message)s',
+#                     level=logging.DEBUG)
 
-
-def get_version_model(config_name, client):
-    dict_push = {}
-    for count, value in enumerate(client.search_model_versions(f"name='{config_name}'")):
-        # Все версии модели
-        dict_push[count] = value
-    return dict(list(dict_push.items())[-1][1])['version']
-
+def get_latest_version_number(config_name, client):
+    model_versions = client.search_model_versions(f"name='{config_name}'")
+    return max(model_version.version for model_version in model_versions)
 
 def main():
     comments = gc.get_all_comments(**config['comments'])
@@ -45,14 +42,10 @@ def main():
     cleaned_comments = pt.get_clean_text(comments, stop_words)
 
     tfidf = TfidfVectorizer(**config['tf_model']).fit(cleaned_comments)
-
     mtx = pt.vectorize_text(cleaned_comments, tfidf)
-
     cluster_labels = cl.get_clusters(mtx, random_state=SEED, **config['clustering'])
 
-    # Обучение линейной модели на поиск сформированных тематик
     X_train, X_test, y_train, y_test = train_test_split(mtx, cluster_labels, **config['cross_val'], random_state=SEED)
-
     clf_lr = LogisticRegression(**config['model'])
 
     mlflow.set_tracking_uri("http://localhost:5000")
@@ -72,21 +65,22 @@ def main():
         mlflow.sklearn.log_model(clf_lr,
                                  artifact_path='model_lr',
                                  registered_model_name=f"{config['model_lr']}")
-        mlflow.log_artifact(local_path='./train.py',
+        mlflow.log_artifact(local_path='./src/models/train.py',
                             artifact_path='code')
         mlflow.end_run()
 
-    client = MlflowClient()
-    last_version_lr = get_version_model(config['model_lr'], client)
-    last_version_vec = get_version_model(config['model_vec'], client)
+    with open(config_path, 'r') as file:
+        yaml_file = yaml.safe_load(file)
 
-    yaml_file = yaml.safe_load(open(config_path))
+    client = MlflowClient()
+    last_version_lr = get_latest_version_number(config['model_lr'], client)
+    last_version_vec = get_latest_version_number(config['model_vec'], client)
+
     yaml_file['predict']["version_lr"] = int(last_version_lr)
     yaml_file['predict']["version_vec"] = int(last_version_vec)
 
-    with open(config_path, 'w') as fp:
-        yaml.dump(yaml_file, fp, encoding='UTF-8', allow_unicode=True)
-
+    with open(config_path, 'w') as file:
+        yaml.dump(yaml_file, file, encoding='UTF-8', allow_unicode=True)
 
 if __name__ == "__main__":
     main()
